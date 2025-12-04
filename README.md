@@ -137,7 +137,7 @@ services:
 
   bookstack-db:
     container_name: bookstack-db
-    image: mariadb:11-alpine
+    image: mariadb:12
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_NAME:-bookstack}
@@ -369,7 +369,7 @@ docker stop bookstack bookstack-db
 
 # 3. Actualizar imágenes
 docker pull lscr.io/linuxserver/bookstack:latest
-docker pull mariadb:11-alpine
+docker pull mariadb:12
 
 # 4. Iniciar stack
 docker start bookstack-db
@@ -397,7 +397,7 @@ docker rm bookstack-db
 # 3. Eliminar volumen antiguo
 docker volume rm bookstack_db
 
-# 4. Recrear con MariaDB 11
+# 4. Recrear con MariaDB 12
 docker compose up -d bookstack-db
 
 # 5. Esperar inicialización
