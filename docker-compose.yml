@@ -7,7 +7,7 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Madrid
-      APP_URL: https://${DOMAIN_HOST:-bookstack.example.com}
+      APP_URL: https://${DOMAIN_HOST}
       DB_HOST: bookstack-db
       DB_PORT: 3306
       DB_DATABASE: ${DB_NAME:-bookstack}
@@ -23,7 +23,7 @@ services:
 
   bookstack-db:
     container_name: bookstack-db
-    image: mariadb:11-alpine
+    image: mariadb:12-alpine
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_NAME:-bookstack}

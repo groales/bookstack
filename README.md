@@ -21,7 +21,7 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 - **Dominio configurado**: Para acceso HTTPS
 - **Contraseña generada**: DB_PASSWORD
 
-⚠️ **IMPORTANTE**: BookStack requiere MariaDB 11. Este compose incluye el contenedor de base de datos.
+⚠️ **IMPORTANTE**: BookStack requiere MariaDB. Este compose incluye el contenedor de base de datos.
 
 ## Generar Contraseña
 
