@@ -1,0 +1,48 @@
+services:
+  bookstack:
+    container_name: bookstack
+    image: lscr.io/linuxserver/bookstack:latest
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Madrid
+      APP_URL: https://${DOMAIN_HOST:-bookstack.example.com}
+      DB_HOST: bookstack-db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_NAME:-bookstack}
+      DB_USERNAME: ${DB_USER:-bookstack}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - bookstack_config:/config
+    networks:
+      - proxy
+      - bookstack-internal
+    depends_on:
+      - bookstack-db
+
+  bookstack-db:
+    container_name: bookstack-db
+    image: mariadb:11-alpine
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-bookstack}
+      MYSQL_USER: ${DB_USER:-bookstack}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+    volumes:
+      - bookstack_db:/var/lib/mysql
+    networks:
+      - bookstack-internal
+
+volumes:
+  bookstack_config:
+    name: bookstack_config
+  bookstack_db:
+    name: bookstack_db
+
+networks:
+  proxy:
+    external: true
+  bookstack-internal:
+    name: bookstack-internal

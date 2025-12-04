@@ -1,0 +1,13 @@
+# Docker
+.env
+docker-compose.override.yml
+
+# Backups
+*.sql
+*.sql.gz
+*.tar.gz
+backups/
+
+# Logs
+*.log
+logs/
