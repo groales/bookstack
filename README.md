@@ -59,10 +59,10 @@ Permite mantener la configuración actualizada automáticamente desde Git.
 
 ```env
 DB_PASSWORD=tu_password_generado
+DOMAIN_HOST=bookstack.tudominio.com
 ```
 
-7. **Solo para Traefik**: Añade también `DOMAIN_HOST=bookstack.example.com`
-8. Click en **Deploy the stack**
+7. Click en **Deploy the stack**
 
 ### Opción B: Web editor
 
@@ -86,16 +86,13 @@ Para personalización completa del compose.
 - Red `proxy` creada
 - DNS apuntando al servidor
 
-Si desplegaste con **Opción A (Git Repository)**, ya configuraste todo en el paso 5 y 7. Simplemente accede a `https://bookstack.tudominio.com`
+Si desplegaste con **Opción A (Git Repository)**, ya configuraste todo en el paso 5 y 6. Simplemente accede a `https://bookstack.tudominio.com`
 
 Si usas otra forma de despliegue:
 
 1. Asegúrate de tener el archivo `docker-compose.override.traefik.yml.example` como `docker-compose.override.yml`
 
-2. En las **Environment variables**, añade:
-   ```env
-   DOMAIN_HOST=bookstack.tudominio.com
-   ```
+2. Verifica que en **Environment variables** tienes `DOMAIN_HOST` configurado correctamente
 
 3. Despliega el stack y accede a `https://bookstack.tudominio.com`
 
@@ -501,8 +498,9 @@ docker restart bookstack
 ### Requeridas
 
 | Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
+|----------|-------------|---------|------------
 | `DB_PASSWORD` | Contraseña de MariaDB | `generada_con_openssl` |
+| `DOMAIN_HOST` | Dominio completo (usado en APP_URL) | `bookstack.example.com` |
 
 ### Opcionales
 
@@ -510,7 +508,6 @@ docker restart bookstack
 |----------|-------------|-------------------|
 | `DB_NAME` | Nombre de la base de datos | `bookstack` |
 | `DB_USER` | Usuario de MariaDB | `bookstack` |
-| `DOMAIN_HOST` | Dominio (solo Traefik) | `bookstack.example.com` |
 | `PUID` / `PGID` | UID/GID del usuario | `1000` |
 | `TZ` | Zona horaria | `Europe/Madrid` |
 
