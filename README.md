@@ -112,7 +112,7 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Madrid
-      APP_URL: https://${DOMAIN_HOST:-bookstack.example.com}
+      APP_URL: https://${DOMAIN_HOST}
       APP_KEY: ${APP_KEY}
       DB_HOST: bookstack-db
       DB_PORT: 3306
