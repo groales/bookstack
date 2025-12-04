@@ -23,16 +23,19 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 
 ⚠️ **IMPORTANTE**: BookStack requiere MariaDB. Este compose incluye el contenedor de base de datos.
 
-## Generar Contraseña
+## Generar Claves y Contraseñas
 
-**Antes de cualquier despliegue**, genera una contraseña segura:
+**Antes de cualquier despliegue**, genera las claves necesarias:
 
 ```bash
+# APP_KEY (BookStack)
+docker run -it --rm --entrypoint /bin/bash lscr.io/linuxserver/bookstack:latest appkey
+
 # DB_PASSWORD (MariaDB)
 openssl rand -base64 32
 ```
 
-Guarda el resultado, lo necesitarás en el archivo `.env`.
+Guarda los resultados, los necesitarás en el archivo `.env`.
 
 > ⚠️ **Importante**: Usa comillas simples en el archivo `.env` si la contraseña contiene caracteres especiales.
 > Ejemplo: `DB_PASSWORD='tu_password_generado'`
@@ -58,6 +61,7 @@ Permite mantener la configuración actualizada automáticamente desde Git.
 6. En **Environment variables**, añade:
 
 ```env
+APP_KEY=base64:tu_clave_generada
 DB_PASSWORD=tu_password_generado
 DOMAIN_HOST=bookstack.tudominio.com
 ```
@@ -109,6 +113,7 @@ services:
       PGID: 1000
       TZ: Europe/Madrid
       APP_URL: https://${DOMAIN_HOST:-bookstack.example.com}
+      APP_KEY: ${APP_KEY}
       DB_HOST: bookstack-db
       DB_PORT: 3306
       DB_DATABASE: ${DB_NAME:-bookstack}
@@ -499,6 +504,7 @@ docker restart bookstack
 
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|------------
+| `APP_KEY` | Clave de encriptación Laravel | `base64:generada_con_docker` |
 | `DB_PASSWORD` | Contraseña de MariaDB | `generada_con_openssl` |
 | `DOMAIN_HOST` | Dominio completo (usado en APP_URL) | `bookstack.example.com` |
 
