@@ -81,6 +81,89 @@ Para personalización completa del compose.
 
 ---
 
+## Despliegue con Docker CLI
+
+Si prefieres trabajar desde la línea de comandos:
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://git.ictiberia.com/groales/bookstack.git
+cd bookstack
+```
+
+### 2. Generar APP_KEY y contraseña
+
+**APP_KEY** (requerido por BookStack):
+
+```bash
+docker run --rm lscr.io/linuxserver/bookstack:latest php /app/www/artisan key:generate --show
+```
+
+Salida esperada: `base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=`
+
+**DB_PASSWORD** (contraseña de MariaDB):
+
+```bash
+openssl rand -base64 32
+```
+
+### 3. Elegir modo de despliegue
+
+#### Opción A: Traefik (recomendado para producción)
+
+```bash
+cp docker-compose.override.traefik.yml.example docker-compose.override.yml
+cp .env.example .env
+nano .env  # Editar: pegar APP_KEY, DB_PASSWORD, configurar DOMAIN_HOST
+```
+
+⚠️ **IMPORTANTE**: `DOMAIN_HOST` es **obligatoria** en todos los casos (BookStack la usa en `APP_URL`).
+
+#### Opción B: Nginx Proxy Manager
+
+```bash
+cp .env.example .env
+nano .env  # Editar: pegar APP_KEY, DB_PASSWORD, configurar DOMAIN_HOST
+```
+
+### 4. Iniciar el servicio
+
+```bash
+docker compose up -d
+```
+
+La inicialización puede tardar **30-60 segundos** (MariaDB + BookStack migrations).
+
+### 5. Verificar el despliegue
+
+```bash
+# Ver logs en tiempo real
+docker compose logs -f bookstack
+
+# Verificar contenedores activos
+docker compose ps
+
+# Comprobar base de datos
+docker compose exec bookstack-db mysql -ubookstack -p$DB_PASSWORD -e "SHOW DATABASES;"
+```
+
+**Acceso**:
+- Traefik: `https://<DOMAIN_HOST>` (ejemplo: `https://bookstack.example.com`)
+- NPM: Configurar en NPM apuntando a `bookstack` puerto `80`
+
+**Credenciales iniciales** (⚠️ **CRÍTICO: cambiar inmediatamente**):
+- Email: `admin@admin.com`
+- Contraseña: `password`
+
+**Después del primer login**:
+1. Ir a **Settings** → **Users**
+2. Editar usuario `Admin`
+3. Cambiar email y contraseña
+4. O eliminar y crear usuario propio
+
+---
+
 ## Modos de Despliegue
 
 ### Traefik (Proxy Inverso con SSL automático)
