@@ -211,17 +211,11 @@ services:
       - bookstack-db
     labels:
       - traefik.enable=true
-      - traefik.http.routers.bookstack-http.rule=Host(`${DOMAIN_HOST}`)
-      - traefik.http.routers.bookstack-http.entrypoints=web
-      - traefik.http.routers.bookstack-http.middlewares=redirect-to-https
       - traefik.http.routers.bookstack.rule=Host(`${DOMAIN_HOST}`)
       - traefik.http.routers.bookstack.entrypoints=websecure
-      - traefik.http.routers.bookstack.tls=true
       - traefik.http.routers.bookstack.tls.certresolver=letsencrypt
       - traefik.http.routers.bookstack.service=bookstack-svc
       - traefik.http.services.bookstack-svc.loadbalancer.server.port=80
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
 
   bookstack-db:
     container_name: bookstack-db
