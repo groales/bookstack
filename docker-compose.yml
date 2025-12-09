@@ -10,10 +10,11 @@ services:
       APP_URL: https://${DOMAIN_HOST}
       APP_KEY: ${APP_KEY}
       DB_HOST: bookstack-db
-      DB_PORT: 3306
+      DB_PORT: 5432
       DB_DATABASE: ${DB_NAME:-bookstack}
       DB_USERNAME: ${DB_USER:-bookstack}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_CONNECTION: pgsql
     volumes:
       - bookstack_config:/config
     networks:
@@ -24,15 +25,14 @@ services:
 
   bookstack-db:
     container_name: bookstack-db
-    image: mariadb:12
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-bookstack}
-      MYSQL_USER: ${DB_USER:-bookstack}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      POSTGRES_DB: ${DB_NAME:-bookstack}
+      POSTGRES_USER: ${DB_USER:-bookstack}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - bookstack_db:/var/lib/mysql
+      - bookstack_db:/var/lib/postgresql/data
     networks:
       - bookstack-internal
 

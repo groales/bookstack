@@ -21,7 +21,7 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 - **Dominio configurado**: Para acceso HTTPS
 - **Contraseña generada**: DB_PASSWORD
 
-⚠️ **IMPORTANTE**: BookStack requiere MariaDB. Este compose incluye el contenedor de base de datos.
+⚠️ **IMPORTANTE**: BookStack soporta PostgreSQL desde v23.02. Este compose incluye PostgreSQL 18.
 
 ## Generar Claves y Contraseñas
 
@@ -31,7 +31,7 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 # APP_KEY (BookStack)
 docker run -it --rm --entrypoint /bin/bash lscr.io/linuxserver/bookstack:latest appkey
 
-# DB_PASSWORD (MariaDB)
+# DB_PASSWORD (PostgreSQL)
 openssl rand -base64 32
 ```
 
@@ -102,7 +102,7 @@ docker run --rm lscr.io/linuxserver/bookstack:latest php /app/www/artisan key:ge
 
 Salida esperada: `base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=`
 
-**DB_PASSWORD** (contraseña de MariaDB):
+**DB_PASSWORD** (contraseña de PostgreSQL):
 
 ```bash
 openssl rand -base64 32
@@ -133,7 +133,7 @@ nano .env  # Editar: pegar APP_KEY, DB_PASSWORD, configurar DOMAIN_HOST
 docker compose up -d
 ```
 
-La inicialización puede tardar **30-60 segundos** (MariaDB + BookStack migrations).
+La inicialización puede tardar **30-60 segundos** (PostgreSQL + BookStack migrations).
 
 ### 5. Verificar el despliegue
 
@@ -145,7 +145,7 @@ docker compose logs -f bookstack
 docker compose ps
 
 # Comprobar base de datos
-docker compose exec bookstack-db mysql -ubookstack -p$DB_PASSWORD -e "SHOW DATABASES;"
+docker compose exec bookstack-db psql -U bookstack -d bookstack -c "\l"
 ```
 
 **Acceso**:
@@ -218,15 +218,14 @@ services:
 
   bookstack-db:
     container_name: bookstack-db
-    image: mariadb:12
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-bookstack}
-      MYSQL_USER: ${DB_USER:-bookstack}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      POSTGRES_DB: ${DB_NAME:-bookstack}
+      POSTGRES_USER: ${DB_USER:-bookstack}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - bookstack_db:/var/lib/mysql
+      - bookstack_db:/var/lib/postgresql/data
     networks:
       - bookstack-internal
 
@@ -377,8 +376,8 @@ docker exec bookstack php artisan bookstack:regenerate-search
 ### Backup Manual
 
 ```bash
-# Backup de MariaDB
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-backup-$(date +%Y%m%d).sql
+# Backup de PostgreSQL
+docker exec bookstack-db pg_dump -U bookstack bookstack > bookstack-backup-$(date +%Y%m%d).sql
 
 # Backup de configuración y uploads
 docker run --rm -v bookstack_config:/backup -v $(pwd):/target alpine tar czf /target/bookstack-config-$(date +%Y%m%d).tar.gz -C /backup .
@@ -396,8 +395,8 @@ DB_PASSWORD="tu_password_aqui"
 
 mkdir -p $BACKUP_DIR
 
-# MariaDB
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack | gzip > $BACKUP_DIR/bookstack-db-$DATE.sql.gz
+# PostgreSQL
+docker exec bookstack-db pg_dump -U bookstack bookstack | gzip > $BACKUP_DIR/bookstack-db-$DATE.sql.gz
 
 # Configuración
 docker run --rm -v bookstack_config:/backup -v $BACKUP_DIR:/target alpine tar czf /target/bookstack-config-$DATE.tar.gz -C /backup .
@@ -425,8 +424,8 @@ crontab -e
 # Detener BookStack
 docker stop bookstack
 
-# Restaurar MariaDB
-gunzip < bookstack-db-20250101.sql.gz | docker exec -i bookstack-db mariadb -u bookstack -p${DB_PASSWORD} bookstack
+# Restaurar PostgreSQL
+gunzip < bookstack-db-20250101.sql.gz | docker exec -i bookstack-db psql -U bookstack -d bookstack
 
 # Restaurar configuración
 docker run --rm -v bookstack_config:/restore -v $(pwd):/source alpine tar xzf /source/bookstack-config-20250101.tar.gz -C /restore
@@ -443,14 +442,14 @@ docker start bookstack
 
 ```bash
 # 1. Backup ANTES de actualizar
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-pre-update-$(date +%Y%m%d).sql
+docker exec bookstack-db pg_dump -U bookstack bookstack > bookstack-pre-update-$(date +%Y%m%d).sql
 
 # 2. Detener stack
 docker stop bookstack bookstack-db
 
 # 3. Actualizar imágenes
 docker pull lscr.io/linuxserver/bookstack:latest
-docker pull mariadb:12
+docker pull postgres:18-alpine
 
 # 4. Iniciar stack
 docker start bookstack-db
@@ -461,34 +460,6 @@ docker start bookstack
 docker logs -f bookstack
 
 # 6. Verificar versión en Settings → About
-```
-
-### Actualizar MariaDB
-
-Si necesitas actualizar de MariaDB 10 a 11 (ya está en 11):
-
-```bash
-# 1. Backup
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-db-migration.sql
-
-# 2. Detener y eliminar contenedor antiguo
-docker stop bookstack-db
-docker rm bookstack-db
-
-# 3. Eliminar volumen antiguo
-docker volume rm bookstack_db
-
-# 4. Recrear con MariaDB 12
-docker compose up -d bookstack-db
-
-# 5. Esperar inicialización
-sleep 15
-
-# 6. Restaurar datos
-cat bookstack-db-migration.sql | docker exec -i bookstack-db mariadb -u bookstack -p${DB_PASSWORD} bookstack
-
-# 7. Iniciar BookStack
-docker start bookstack
 ```
 
 ---
@@ -505,7 +476,7 @@ docker logs bookstack
 ```
 
 **Soluciones**:
-- Verificar que MariaDB esté funcionando: `docker logs bookstack-db`
+- Verificar que PostgreSQL esté funcionando: `docker logs bookstack-db`
 - Comprobar contraseña en `.env`
 - Verificar permisos del volumen: `docker exec bookstack ls -la /config`
 
@@ -515,8 +486,8 @@ docker logs bookstack
 
 **Solución**:
 ```bash
-# Verificar que MariaDB esté lista
-docker exec bookstack-db mariadb -u bookstack -p${DB_PASSWORD} -e "SELECT 1"
+# Verificar que PostgreSQL esté lista
+docker exec bookstack-db psql -U bookstack -d bookstack -c "SELECT 1"
 
 # Reiniciar servicios en orden
 docker restart bookstack-db
@@ -541,13 +512,13 @@ docker restart bookstack
 # Ver uso de recursos
 docker stats bookstack bookstack-db
 
-# Ver queries lentas en MariaDB
-docker exec bookstack-db mariadb -u bookstack -p${DB_PASSWORD} -e "SHOW FULL PROCESSLIST;"
+# Ver queries lentas en PostgreSQL
+docker exec bookstack-db psql -U bookstack -d bookstack -c "SELECT pid, now() - pg_stat_activity.query_start AS duration, query FROM pg_stat_activity WHERE state = 'active' ORDER BY duration DESC;"
 ```
 
 **Soluciones**:
 - Limpiar caché: `docker exec bookstack php artisan cache:clear`
-- Optimizar BD: `docker exec bookstack-db mariadb-optimize -u bookstack -p${DB_PASSWORD} bookstack`
+- Optimizar BD: `docker exec bookstack-db vacuumdb -U bookstack -d bookstack -z`
 - Regenerar índices de búsqueda: `docker exec bookstack php artisan bookstack:regenerate-search`
 
 ### Comandos de emergencia
@@ -581,7 +552,7 @@ docker restart bookstack
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|------------
 | `APP_KEY` | Clave de encriptación Laravel | `base64:generada_con_docker` |
-| `DB_PASSWORD` | Contraseña de MariaDB | `generada_con_openssl` |
+| `DB_PASSWORD` | Contraseña de PostgreSQL | `generada_con_openssl` |
 | `DOMAIN_HOST` | Dominio completo (usado en APP_URL) | `bookstack.example.com` |
 
 ### Opcionales
