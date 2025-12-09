@@ -1,22 +1,9 @@
 services:
   bookstack:
     labels:
-      # Habilitar Traefik
       - traefik.enable=true
-      
-      # Router HTTP (redirige a HTTPS)
-      - traefik.http.routers.bookstack-http.rule=Host(`${DOMAIN_HOST}`)
-      - traefik.http.routers.bookstack-http.entrypoints=web
-      - traefik.http.routers.bookstack-http.middlewares=redirect-to-https
-      
-      # Router HTTPS
       - traefik.http.routers.bookstack.rule=Host(`${DOMAIN_HOST}`)
       - traefik.http.routers.bookstack.entrypoints=websecure
-      - traefik.http.routers.bookstack.tls=true
       - traefik.http.routers.bookstack.tls.certresolver=letsencrypt
       - traefik.http.routers.bookstack.service=bookstack-svc
       - traefik.http.services.bookstack-svc.loadbalancer.server.port=80
-      
-      # Redirect middleware
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
