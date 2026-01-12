@@ -16,7 +16,7 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 ## Requisitos Previos
 
 - Docker Engine instalado
-- Portainer configurado (recomendado)
+- Docker Compose instalado
 - **Para Traefik o NPM**: Red Docker `proxy` creada
 - **Dominio configurado**: Para acceso HTTPS
 - **Contraseña generada**: DB_PASSWORD
@@ -42,57 +42,74 @@ Guarda los resultados, los necesitarás en el archivo `.env`.
 
 ---
 
-## Despliegue con Portainer
+## Despliegue con Docker Compose
 
-### Opción A: Git Repository (Recomendada)
-
-Permite mantener la configuración actualizada automáticamente desde Git.
-
-1. En Portainer, ve a **Stacks** → **Add stack**
-2. Nombra el stack: `bookstack`
-3. Selecciona **Git Repository**
-4. Configura:
-   - **Repository URL**: `https://git.ictiberia.com/groales/bookstack`
-   - **Repository reference**: `refs/heads/main`
-   - **Compose path**: `docker-compose.yml`
-   - **GitOps updates**: Activado (opcional - auto-actualización)
-5. **Solo para Traefik**: En **Additional paths**, añade:
-   - `docker-compose.override.traefik.yml.example`
-6. En **Environment variables**, añade:
-
-```env
-APP_KEY=base64:tu_clave_generada
-DB_PASSWORD=tu_password_generado
-DOMAIN_HOST=bookstack.tudominio.com
-```
-
-7. Click en **Deploy the stack**
-
-### Opción B: Web editor
-
-Para personalización completa del compose.
-
-1. En Portainer, ve a **Stacks** → **Add stack**
-2. Nombra el stack: `bookstack`
-3. Selecciona **Web editor**
-4. Pega el contenido de `docker-compose.yml`
-5. En **Environment variables**, añade las mismas variables que la Opción A
-6. Click en **Deploy the stack**
-
----
-
-## Despliegue con Docker CLI
-
-Si prefieres trabajar desde la línea de comandos:
-
-### 1. Clonar el repositorio
+### 1. Crear Directorio y Archivos
 
 ```bash
-git clone https://git.ictiberia.com/groales/bookstack.git
+# Crear directorio
+mkdir bookstack
 cd bookstack
 ```
 
-### 2. Generar APP_KEY y contraseña
+### 2. Crear docker-compose.yml
+
+Crea el archivo `docker-compose.yml`:
+
+```yaml
+services:
+  bookstack:
+    container_name: bookstack
+    image: lscr.io/linuxserver/bookstack:latest
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Madrid
+      APP_URL: https://${DOMAIN_HOST}
+      APP_KEY: ${APP_KEY}
+      DB_HOST: bookstack-db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_NAME:-bookstack}
+      DB_USERNAME: ${DB_USER:-bookstack}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - bookstack-data:/config
+    depends_on:
+      bookstack-db:
+        condition: service_healthy
+
+  bookstack-db:
+    container_name: bookstack-db
+    image: lscr.io/linuxserver/mariadb:latest
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Madrid
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-bookstack}
+      MYSQL_USER: ${DB_USER:-bookstack}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - bookstack-db:/config
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bookstack-data:
+  bookstack-db:
+
+networks:
+  default:
+    external: true
+    name: proxy
+```
+
+### 3. Generar APP_KEY y Contraseña
 
 **APP_KEY** (requerido por BookStack):
 
@@ -108,59 +125,91 @@ Salida esperada: `base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=`
 openssl rand -base64 32
 ```
 
-### 3. Elegir modo de despliegue
+### 4. Configurar Variables de Entorno
 
-#### Opción A: Traefik (recomendado para producción)
+Crea el archivo `.env`:
 
-```bash
-cp docker-compose.override.traefik.yml.example docker-compose.override.yml
-cp .env.example .env
-nano .env  # Editar: pegar APP_KEY, DB_PASSWORD, configurar DOMAIN_HOST
+```env
+# Dominio
+DOMAIN_HOST=bookstack.dominio.com
+
+# Claves de Seguridad (GENERAR NUEVAS)
+APP_KEY=base64:tu_clave_generada
+DB_PASSWORD=tu_password_generado
+
+# Base de datos (valores por defecto)
+DB_NAME=bookstack
+DB_USER=bookstack
 ```
 
-⚠️ **IMPORTANTE**: `DOMAIN_HOST` es **obligatoria** en todos los casos (BookStack la usa en `APP_URL`).
+### 5. (Opcional) Configurar Traefik
 
-#### Opción B: Nginx Proxy Manager
+Si usas Traefik, crea `docker-compose.override.yml`:
 
-```bash
-cp .env.example .env
-nano .env  # Editar: pegar APP_KEY, DB_PASSWORD, configurar DOMAIN_HOST
+```yaml
+services:
+  bookstack:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bookstack.rule=Host(`${DOMAIN_HOST}`)
+      - traefik.http.routers.bookstack.entrypoints=websecure
+      - traefik.http.routers.bookstack.tls.certresolver=letsencrypt
+      - traefik.http.services.bookstack.loadbalancer.server.port=80
 ```
 
-### 4. Iniciar el servicio
+### 6. Desplegar
 
 ```bash
+# Crear red proxy si no existe
+docker network create proxy
+
+# Iniciar servicios
 docker compose up -d
+
+# Ver logs
+docker compose logs -f bookstack
 ```
 
 La inicialización puede tardar **30-60 segundos** (MariaDB + BookStack migrations).
 
-### 5. Verificar el despliegue
+---
+
+## Método Alternativo: Clonar desde Git
+
+Si prefieres usar Git para mantener la configuración actualizada:
 
 ```bash
-# Ver logs en tiempo real
-docker compose logs -f bookstack
+# Clonar repositorio
+git clone https://git.ictiberia.com/groales/bookstack.git
+cd bookstack
 
-# Verificar contenedores activos
-docker compose ps
+# Copiar ejemplo de variables
+cp .env.example .env
+nano .env  # Editar con tus claves
 
-# Comprobar base de datos
-docker compose exec bookstack-db mysql -ubookstack -p$DB_PASSWORD -e "SHOW DATABASES;"
+# (Opcional) Configurar Traefik
+cp docker-compose.override.traefik.yml.example docker-compose.override.yml
+
+# Desplegar
+docker compose up -d
 ```
 
-**Acceso**:
-- Traefik: `https://<DOMAIN_HOST>` (ejemplo: `https://bookstack.example.com`)
-- NPM: Configurar en NPM apuntando a `bookstack` puerto `80`
+---
 
-**Credenciales iniciales** (⚠️ **CRÍTICO: cambiar inmediatamente**):
+## Acceso y Credenciales Iniciales
+
+**URL de acceso**:
+- Con Traefik: `https://bookstack.tudominio.com`
+- Con NPM: Configurar Proxy Host apuntando a `bookstack:80`
+
+**Credenciales por defecto** (⚠️ **CAMBIAR INMEDIATAMENTE**):
 - Email: `admin@admin.com`
 - Contraseña: `password`
 
-**Después del primer login**:
-1. Ir a **Settings** → **Users**
-2. Editar usuario `Admin`
-3. Cambiar email y contraseña
-4. O eliminar y crear usuario propio
+**Tras el primer login**:
+1. Click en avatar → **Edit Profile**
+2. **Change Password** → Establecer contraseña segura
+3. Cambiar email si es necesario
 
 ---
 
@@ -173,17 +222,14 @@ docker compose exec bookstack-db mysql -ubookstack -p$DB_PASSWORD -e "SHOW DATAB
 - Red `proxy` creada
 - DNS apuntando al servidor
 
-Si desplegaste con **Opción A (Git Repository)**, ya configuraste todo en el paso 5 y 6. Simplemente accede a `https://bookstack.tudominio.com`
+**Configuración**:
 
-Si usas otra forma de despliegue:
+1. Crea `docker-compose.override.yml` con las labels de Traefik (ver paso 5)
+2. Configura `DOMAIN_HOST` en el archivo `.env`
+3. Despliega con `docker compose up -d`
+4. Accede a `https://bookstack.tudominio.com`
 
-1. Asegúrate de tener el archivo `docker-compose.override.traefik.yml.example` como `docker-compose.override.yml`
-
-2. Verifica que en **Environment variables** tienes `DOMAIN_HOST` configurado correctamente
-
-3. Despliega el stack y accede a `https://bookstack.tudominio.com`
-
-**Ejemplo de compose completo con Traefik**:
+**Compose completo con Traefik**:
 
 ```yaml
 services:
