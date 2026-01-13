@@ -18,7 +18,7 @@ services:
       - bookstack_config:/config
     networks:
       - proxy
-      - bookstack-internal
+      - default
     depends_on:
       - bookstack-db
 
@@ -33,8 +33,6 @@ services:
       MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
     volumes:
       - bookstack_db:/var/lib/mysql
-    networks:
-      - bookstack-internal
 
 volumes:
   bookstack_config:
@@ -43,7 +41,6 @@ volumes:
     name: bookstack_db
 
 networks:
+  default:
   proxy:
     external: true
-  bookstack-internal:
-    name: bookstack-internal
