@@ -74,39 +74,35 @@ services:
       DB_USERNAME: ${DB_USER:-bookstack}
       DB_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - bookstack-data:/config
+      - bookstack_config:/config
+    networks:
+      - proxy
+      - default
     depends_on:
-      bookstack-db:
-        condition: service_healthy
+      - bookstack-db
 
   bookstack-db:
     container_name: bookstack-db
-    image: lscr.io/linuxserver/mariadb:latest
+    image: mariadb:12
     restart: unless-stopped
     environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Madrid
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME:-bookstack}
       MYSQL_USER: ${DB_USER:-bookstack}
       MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
     volumes:
-      - bookstack-db:/config
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - bookstack_db:/var/lib/mysql
 
 volumes:
-  bookstack-data:
-  bookstack-db:
+  bookstack_config:
+    name: bookstack_config
+  bookstack_db:
+    name: bookstack_db
 
 networks:
   default:
+  proxy:
     external: true
-    name: proxy
 ```
 
 ### 3. Generar APP_KEY y Contraseña
