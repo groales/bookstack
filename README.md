@@ -17,9 +17,8 @@ Plataforma de documentación y wiki de código abierto. Organiza contenido en li
 
 - Docker Engine instalado
 - Docker Compose instalado
-- **Para Traefik o NPM**: Red Docker `proxy` creada
-- **Dominio configurado**: Para acceso HTTPS
-- **Contraseña generada**: DB_PASSWORD
+- Red Docker externa `proxy` creada si vas a usar un proxy inverso genérico
+- APP_KEY y DB_PASSWORD generadas
 
 ⚠️ **IMPORTANTE**: BookStack requiere MariaDB. Este compose incluye el contenedor de base de datos.
 
@@ -62,11 +61,13 @@ services:
     container_name: bookstack
     image: lscr.io/linuxserver/bookstack:latest
     restart: unless-stopped
+    ports:
+      - 6875:80
     environment:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Madrid
-      APP_URL: https://${DOMAIN_HOST}
+      APP_URL: ${APP_URL}
       APP_KEY: ${APP_KEY}
       DB_HOST: bookstack-db
       DB_PORT: 3306
@@ -126,8 +127,10 @@ openssl rand -base64 32
 Crea el archivo `.env`:
 
 ```env
-# Dominio
-DOMAIN_HOST=bookstack.dominio.com
+# URL final de acceso a BookStack
+# Ejemplo local:  http://localhost:6875
+# Ejemplo con proxy: https://bookstack.midominio.com
+APP_URL=http://localhost:6875
 
 # Claves de Seguridad (GENERAR NUEVAS)
 APP_KEY=base64:tu_clave_generada
@@ -138,22 +141,7 @@ DB_NAME=bookstack
 DB_USER=bookstack
 ```
 
-### 5. (Opcional) Configurar Traefik
-
-Si usas Traefik, crea `docker-compose.override.yml`:
-
-```yaml
-services:
-  bookstack:
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.bookstack.rule=Host(`${DOMAIN_HOST}`)
-      - traefik.http.routers.bookstack.entrypoints=websecure
-      - traefik.http.routers.bookstack.tls.certresolver=letsencrypt
-      - traefik.http.services.bookstack.loadbalancer.server.port=80
-```
-
-### 6. Desplegar
+### 5. Desplegar
 
 ```bash
 # Crear red proxy si no existe
@@ -176,15 +164,15 @@ Si prefieres usar Git para mantener la configuración actualizada:
 
 ```bash
 # Clonar repositorio
-git clone https://git.ictiberia.com/groales/bookstack.git
+git clone https://github.com/groales/bookstack.git
 cd bookstack
 
 # Copiar ejemplo de variables
 cp .env.example .env
 nano .env  # Editar con tus claves
 
-# (Opcional) Configurar Traefik
-cp docker-compose.override.traefik.yml.example docker-compose.override.yml
+# Crear red proxy si no existe
+docker network create proxy
 
 # Desplegar
 docker compose up -d
@@ -195,8 +183,8 @@ docker compose up -d
 ## Acceso y Credenciales Iniciales
 
 **URL de acceso**:
-- Con Traefik: `https://bookstack.tudominio.com`
-- Con NPM: Configurar Proxy Host apuntando a `bookstack:80`
+- Local: `http://localhost:6875`
+- Con proxy inverso genérico: la URL que hayas definido en `APP_URL`
 
 **Credenciales por defecto** (⚠️ **CAMBIAR INMEDIATAMENTE**):
 - Email: `admin@admin.com`
@@ -206,112 +194,6 @@ docker compose up -d
 1. Click en avatar → **Edit Profile**
 2. **Change Password** → Establecer contraseña segura
 3. Cambiar email si es necesario
-
----
-
-## Modos de Despliegue
-
-### Traefik (Proxy Inverso con SSL automático)
-
-**Requisitos**:
-- Stack de Traefik desplegado
-- Red `proxy` creada
-- DNS apuntando al servidor
-
-**Configuración**:
-
-1. Crea `docker-compose.override.yml` con las labels de Traefik (ver paso 5)
-2. Configura `DOMAIN_HOST` en el archivo `.env`
-3. Despliega con `docker compose up -d`
-4. Accede a `https://bookstack.tudominio.com`
-
-**Compose completo con Traefik**:
-
-```yaml
-services:
-  bookstack:
-    container_name: bookstack
-    image: lscr.io/linuxserver/bookstack:latest
-    restart: unless-stopped
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Madrid
-      APP_URL: https://${DOMAIN_HOST}
-      APP_KEY: ${APP_KEY}
-      DB_HOST: bookstack-db
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_NAME:-bookstack}
-      DB_USERNAME: ${DB_USER:-bookstack}
-      DB_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - bookstack_config:/config
-    networks:
-      - proxy
-      - bookstack-internal
-    depends_on:
-      - bookstack-db
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.bookstack.rule=Host(`${DOMAIN_HOST}`)
-      - traefik.http.routers.bookstack.entrypoints=websecure
-      - traefik.http.routers.bookstack.tls.certresolver=letsencrypt
-      - traefik.http.services.bookstack.loadbalancer.server.port=80
-
-  bookstack-db:
-    container_name: bookstack-db
-    image: mariadb:12
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${DB_NAME:-bookstack}
-      MYSQL_USER: ${DB_USER:-bookstack}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
-    volumes:
-      - bookstack_db:/var/lib/mysql
-    networks:
-      - bookstack-internal
-
-volumes:
-  bookstack_config:
-    name: bookstack_config
-  bookstack_db:
-    name: bookstack_db
-
-networks:
-  proxy:
-    external: true
-  bookstack-internal:
-    name: bookstack-internal
-```
-
-### Nginx Proxy Manager (NPM)
-
-**Requisitos**:
-- NPM desplegado y accesible
-- Red `proxy` creada
-- DNS apuntando al servidor
-
-**Pasos**:
-
-1. Despliega el stack con el `docker-compose.yml` base (sin override)
-
-2. En NPM, crea un nuevo **Proxy Host**:
-   - **Domain Names**: `bookstack.tudominio.com`
-   - **Scheme**: `http`
-   - **Forward Hostname / IP**: `bookstack`
-   - **Forward Port**: `80`
-   - **Cache Assets**: ✅ Activado
-   - **Block Common Exploits**: ✅ Activado
-   - **Websockets Support**: ✅ Activado
-
-3. En la pestaña **SSL**:
-   - **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt)
-   - **Force SSL**: ✅ Activado
-   - **HTTP/2 Support**: ✅ Activado
-   - **HSTS Enabled**: ✅ Activado (opcional)
-
-4. Guarda y accede a `https://bookstack.tudominio.com`
 
 ---
 
@@ -621,10 +503,10 @@ docker restart bookstack
 ### Requeridas
 
 | Variable | Descripción | Ejemplo |
-|----------|-------------|---------|------------
+|----------|-------------|---------|
+| `APP_URL` | URL final de acceso a BookStack | `http://localhost:6875` |
 | `APP_KEY` | Clave de encriptación Laravel | `base64:generada_con_docker` |
 | `DB_PASSWORD` | Contraseña de MariaDB | `generada_con_openssl` |
-| `DOMAIN_HOST` | Dominio completo (usado en APP_URL) | `bookstack.example.com` |
 
 ### Opcionales
 
