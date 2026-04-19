@@ -51,9 +51,9 @@ mkdir bookstack
 cd bookstack
 ```
 
-### 2. Crear docker-compose.yml
+### 2. Crear compose.yaml
 
-Crea el archivo `docker-compose.yml`:
+Crea el archivo `compose.yaml`:
 
 ```yaml
 services:
