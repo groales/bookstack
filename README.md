@@ -1,263 +1,192 @@
 # BookStack
 
-Plataforma de documentación y wiki de código abierto. Organiza contenido en libros, capítulos y páginas con editor WYSIWYG y Markdown.
+Plataforma de documentación y wiki de código abierto para organizar contenido en libros, capítulos y páginas con editor WYSIWYG y Markdown.
+
+Referencia oficial de instalación: https://docs.linuxserver.io/images/docker-bookstack
 
 ## Características
 
-- 📚 **Organización jerárquica**: Libros → Capítulos → Páginas
-- ✏️ **Editor dual**: WYSIWYG y Markdown
-- 🔍 **Búsqueda potente**: Busca en todo el contenido
-- 🔐 **Control de acceso**: Permisos granulares por rol
-- 📝 **Historial de cambios**: Seguimiento completo de ediciones
-- 🖼️ **Gestión de imágenes**: Biblioteca de medios integrada
-- 🔗 **Integración**: LDAP, SAML, OAuth
-- 🌍 **Multi-idioma**: Soporte para múltiples idiomas
+- 📚 **Organización jerárquica**: Libros, capítulos y páginas para estructurar documentación
+- ✏️ **Editor dual**: WYSIWYG y Markdown en la misma plataforma
+- 🔍 **Búsqueda integrada**: Localiza contenido rápidamente
+- 🔐 **Control de acceso**: Roles y permisos por usuario o equipo
+- 📝 **Historial de cambios**: Registro completo de revisiones
+- 🔗 **Integraciones**: LDAP, SAML y OAuth disponibles
+- 🌍 **Multiidioma**: Soporte para distintos idiomas y localizaciones
 
 ## Requisitos Previos
 
 - Docker Engine instalado
 - Docker Compose instalado
-- Red Docker externa `proxy` creada si vas a usar un proxy inverso genérico
-- APP_KEY y DB_PASSWORD generadas
+- Red Docker externa `proxy` creada si vas a publicar BookStack detrás de un proxy inverso genérico
+- Variables `APP_KEY` y `DB_PASSWORD` generadas antes del despliegue
 
-⚠️ **IMPORTANTE**: BookStack requiere MariaDB. Este compose incluye el contenedor de base de datos.
+> ⚠️ **Importante**: Este `compose.yaml` ya incluye MariaDB, por lo que BookStack y la base de datos se despliegan juntos.
 
-## Generar Claves y Contraseñas
+## Archivos de este Repositorio
 
-**Antes de cualquier despliegue**, genera las claves necesarias:
+Este repositorio contiene:
+
+- `compose.yaml` - Stack base de BookStack y MariaDB
+- `.env.example` - Plantilla de variables de entorno
+- `README.md` - Esta documentación
+
+---
+
+## Generar Claves Seguras
+
+Antes del primer arranque, genera los valores necesarios:
 
 ```bash
-# APP_KEY (BookStack)
-docker run -it --rm --entrypoint /bin/bash lscr.io/linuxserver/bookstack:latest appkey
+# APP_KEY de BookStack
+docker run --rm lscr.io/linuxserver/bookstack:latest php /app/www/artisan key:generate --show
 
-# DB_PASSWORD (MariaDB)
+# Contraseña de MariaDB
 openssl rand -base64 32
 ```
 
-Guarda los resultados, los necesitarás en el archivo `.env`.
+Guarda ambos valores para usarlos en `.env`.
 
-> ⚠️ **Importante**: Usa comillas simples en el archivo `.env` si la contraseña contiene caracteres especiales.
-> Ejemplo: `DB_PASSWORD='tu_password_generado'`
+> 💡 **Tip**: Si `DB_PASSWORD` contiene caracteres especiales, mantenla entre comillas simples en el archivo `.env`.
 
 ---
 
 ## Despliegue con Docker Compose
 
-### 1. Crear Directorio y Archivos
+### 1. Clonar el repositorio
 
 ```bash
-# Crear directorio
-mkdir bookstack
+git clone https://github.com/groales/bookstack.git
 cd bookstack
 ```
 
-### 2. Crear compose.yaml
-
-Crea el archivo `compose.yaml`:
-
-```yaml
-services:
-  bookstack:
-    container_name: bookstack
-    image: lscr.io/linuxserver/bookstack:latest
-    restart: unless-stopped
-    ports:
-      - 6875:80
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Madrid
-      APP_URL: ${APP_URL}
-      APP_KEY: ${APP_KEY}
-      DB_HOST: bookstack-db
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_NAME:-bookstack}
-      DB_USERNAME: ${DB_USER:-bookstack}
-      DB_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - bookstack_config:/config
-    networks:
-      - proxy
-      - default
-    depends_on:
-      - bookstack-db
-
-  bookstack-db:
-    container_name: bookstack-db
-    image: mariadb:12
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${DB_NAME:-bookstack}
-      MYSQL_USER: ${DB_USER:-bookstack}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
-    volumes:
-      - bookstack_db:/var/lib/mysql
-
-volumes:
-  bookstack_config:
-    name: bookstack_config
-  bookstack_db:
-    name: bookstack_db
-
-networks:
-  default:
-  proxy:
-    external: true
-```
-
-### 3. Generar APP_KEY y Contraseña
-
-**APP_KEY** (requerido por BookStack):
+### 2. Preparar el archivo `.env`
 
 ```bash
-docker run --rm lscr.io/linuxserver/bookstack:latest php /app/www/artisan key:generate --show
+cp .env.example .env
 ```
 
-Salida esperada: `base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=`
-
-**DB_PASSWORD** (contraseña de MariaDB):
-
-```bash
-openssl rand -base64 32
-```
-
-### 4. Configurar Variables de Entorno
-
-Crea el archivo `.env`:
+Contenido esperado:
 
 ```env
-# URL final de acceso a BookStack
-# Ejemplo local:  http://localhost:6875
-# Ejemplo con proxy: https://bookstack.midominio.com
 APP_URL=http://localhost:6875
+APP_KEY='base64:tu_clave_generada'
+DB_PASSWORD='tu_password_generado'
 
-# Claves de Seguridad (GENERAR NUEVAS)
-APP_KEY=base64:tu_clave_generada
-DB_PASSWORD=tu_password_generado
-
-# Base de datos (valores por defecto)
 DB_NAME=bookstack
 DB_USER=bookstack
 ```
 
-### 5. Desplegar
+### 3. Crear la red externa si vas a usar proxy
 
 ```bash
-# Crear red proxy si no existe
 docker network create proxy
+```
 
-# Iniciar servicios
+Si no la necesitas, elimina o comenta la red `proxy` en `compose.yaml` antes de arrancar.
+
+### 4. Desplegar
+
+```bash
 docker compose up -d
+```
 
-# Ver logs
+Para seguir el arranque:
+
+```bash
 docker compose logs -f bookstack
 ```
 
-La inicialización puede tardar **30-60 segundos** (MariaDB + BookStack migrations).
+La inicialización puede tardar entre 30 y 60 segundos porque BookStack espera a que MariaDB quede operativa.
 
 ---
 
-## Método Alternativo: Clonar desde Git
+## Acceso Inicial
 
-Si prefieres usar Git para mantener la configuración actualizada:
+Una vez desplegado, accede a BookStack usando la URL definida en `APP_URL`.
+
+```text
+http://localhost:6875
+# o
+https://bookstack.midominio.com
+```
+
+### Credenciales Iniciales
+
+Credenciales por defecto de BookStack:
+
+- Email: `admin@admin.com`
+- Contraseña: `password`
+
+### Primera Configuración
+
+1. Inicia sesión con las credenciales por defecto.
+2. Cambia la contraseña del administrador inmediatamente.
+3. Ajusta nombre, idioma y branding desde `Settings`.
+4. Revisa registro público, roles y permisos antes de abrir acceso a otros usuarios.
+
+---
+
+## Comandos Útiles
+
+### Ver logs
 
 ```bash
-# Clonar repositorio
-git clone https://github.com/groales/bookstack.git
-cd bookstack
+docker compose logs -f bookstack
+docker compose logs -f bookstack-db
+```
 
-# Copiar ejemplo de variables
-cp .env.example .env
-nano .env  # Editar con tus claves
+### Reiniciar servicios
 
-# Crear red proxy si no existe
-docker network create proxy
+```bash
+docker compose restart bookstack
+docker compose restart bookstack-db
+```
 
-# Desplegar
+### Ejecutar comandos de mantenimiento
+
+```bash
+docker exec bookstack php artisan list
+docker exec bookstack php artisan cache:clear
+docker exec bookstack php artisan bookstack:regenerate-search
+```
+
+### Actualizar contenedores
+
+```bash
+docker compose pull
 docker compose up -d
 ```
 
 ---
 
-## Acceso y Credenciales Iniciales
+## Estructura de Persistencia
 
-**URL de acceso**:
-- Local: `http://localhost:6875`
-- Con proxy inverso genérico: la URL que hayas definido en `APP_URL`
-
-**Credenciales por defecto** (⚠️ **CAMBIAR INMEDIATAMENTE**):
-- Email: `admin@admin.com`
-- Contraseña: `password`
-
-**Tras el primer login**:
-1. Click en avatar → **Edit Profile**
-2. **Change Password** → Establecer contraseña segura
-3. Cambiar email si es necesario
+```text
+Volúmenes Docker:
+├── bookstack_config  -> /config
+└── bookstack_db      -> /var/lib/mysql
+```
 
 ---
 
-## Configuración Inicial
+## Configuración Avanzada
 
-### Primer Acceso
+### Variables de Entorno
 
-1. Accede a BookStack usando tu dominio configurado
-2. Login con credenciales por defecto:
-   - **Email**: `admin@admin.com`
-   - **Password**: `password`
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| `APP_URL` | URL final de acceso a BookStack | `http://localhost:6875` |
+| `APP_KEY` | Clave de aplicación Laravel | Sin valor por defecto |
+| `DB_PASSWORD` | Contraseña de MariaDB | Sin valor por defecto |
+| `DB_NAME` | Nombre de la base de datos | `bookstack` |
+| `DB_USER` | Usuario de base de datos | `bookstack` |
 
-3. **⚠️ CRÍTICO**: Cambia la contraseña inmediatamente:
-   - Click en tu avatar (esquina superior derecha)
-   - **Edit Profile** → **Change Password**
+### LDAP, SAML y OAuth
 
-### Panel de Administración
-
-Accede al panel: **Settings** (engranaje superior derecho)
-
-#### Configuración Básica
-
-**Settings → Settings**:
-- **Application Name**: Nombre de tu wiki
-- **Application Description**: Descripción breve
-- **Application Logo**: Sube tu logo personalizado
-- **Default Language**: Español u otro idioma
-
-#### Registro de Usuarios
-
-**Settings → Registration Settings**:
-- **Allow public registration**: Desactivar (❌)
-- **Allow public viewing**: Activar si quieres que usuarios no autenticados puedan leer
-- **Default role for new users**: Seleccionar rol apropiado
-
-#### Roles y Permisos
-
-**Settings → Roles**:
-
-1. **Admin**: Control total
-2. **Editor**: Puede crear y editar contenido
-3. **Viewer**: Solo lectura
-
-Crea roles personalizados según necesites:
-- **Permissions**: Granular por libros, capítulos, páginas
-- **System Permissions**: Gestión de imágenes, ajustes
-
-#### Personalización de Tema
-
-**Settings → Customization**:
-- **Custom HTML Head Content**: Añadir CSS personalizado
-- **Color Scheme**: Claro/Oscuro
-- **Custom Styles**: CSS para personalización avanzada
-
----
-
-## Personalización
-
-### Integración con LDAP
-
-**Settings → Authentication → LDAP**:
+BookStack soporta integración con proveedores externos de autenticación. Si vas a usar LDAP, añade variables como estas al entorno:
 
 ```env
-# Añadir al .env
 LDAP_SERVER=ldap.example.com:389
 LDAP_BASE_DN=dc=example,dc=com
 LDAP_DN=cn=bookstack,ou=Services,dc=example,dc=com
@@ -266,154 +195,14 @@ LDAP_USER_FILTER=(&(uid=${user}))
 LDAP_VERSION=3
 ```
 
-Reinicia el contenedor: `docker restart bookstack`
-
-### SAML / OAuth
-
-**Settings → Authentication**:
-- **SAML 2.0**: Para Active Directory con ADFS
-- **OAuth**: Google, GitHub, GitLab, etc.
-
-Consulta la [documentación oficial](https://www.bookstackapp.com/docs/admin/third-party-auth/) para configuración específica.
-
-### Comandos Personalizados
-
-Acceso al contenedor:
+Después reinicia el contenedor:
 
 ```bash
-# Shell de BookStack
-docker exec -it bookstack bash
-
-# Comandos artisan disponibles
-docker exec bookstack php artisan list
-
-# Limpiar caché
-docker exec bookstack php artisan cache:clear
-
-# Regenerar permisos de búsqueda
-docker exec bookstack php artisan bookstack:regenerate-search
+docker compose restart bookstack
 ```
 
----
-
-## Backup y Restauración
-
-### Backup Manual
-
-```bash
-# Backup de MariaDB
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-backup-$(date +%Y%m%d).sql
-
-# Backup de configuración y uploads
-docker run --rm -v bookstack_config:/backup -v $(pwd):/target alpine tar czf /target/bookstack-config-$(date +%Y%m%d).tar.gz -C /backup .
-```
-
-### Backup Automático
-
-Crea un script en `/root/backup-bookstack.sh`:
-
-```bash
-#!/bin/bash
-BACKUP_DIR="/backups/bookstack"
-DATE=$(date +%Y%m%d-%H%M%S)
-DB_PASSWORD="tu_password_aqui"
-
-mkdir -p $BACKUP_DIR
-
-# MariaDB
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack | gzip > $BACKUP_DIR/bookstack-db-$DATE.sql.gz
-
-# Configuración
-docker run --rm -v bookstack_config:/backup -v $BACKUP_DIR:/target alpine tar czf /target/bookstack-config-$DATE.tar.gz -C /backup .
-
-# Limpiar backups antiguos (mantener 7 días)
-find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
-
-echo "Backup completado: $DATE"
-```
-
-Programa con cron:
-
-```bash
-chmod +x /root/backup-bookstack.sh
-crontab -e
-
-# Backup diario a las 2 AM
-0 2 * * * /root/backup-bookstack.sh
-```
-
-### Restauración
-
-```bash
-# Detener BookStack
-docker stop bookstack
-
-# Restaurar MariaDB
-gunzip < bookstack-db-20250101.sql.gz | docker exec -i bookstack-db mariadb -u bookstack -p${DB_PASSWORD} bookstack
-
-# Restaurar configuración
-docker run --rm -v bookstack_config:/restore -v $(pwd):/source alpine tar xzf /source/bookstack-config-20250101.tar.gz -C /restore
-
-# Iniciar BookStack
-docker start bookstack
-```
-
----
-
-## Actualización
-
-### Actualizar BookStack
-
-```bash
-# 1. Backup ANTES de actualizar
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-pre-update-$(date +%Y%m%d).sql
-
-# 2. Detener stack
-docker stop bookstack bookstack-db
-
-# 3. Actualizar imágenes
-docker pull lscr.io/linuxserver/bookstack:latest
-docker pull mariadb:12
-
-# 4. Iniciar stack
-docker start bookstack-db
-sleep 10
-docker start bookstack
-
-# 5. Verificar logs
-docker logs -f bookstack
-
-# 6. Verificar versión en Settings → About
-```
-
-### Actualizar MariaDB
-
-Si necesitas actualizar de MariaDB 10 a 11 (ya está en 11):
-
-```bash
-# 1. Backup
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-db-migration.sql
-
-# 2. Detener y eliminar contenedor antiguo
-docker stop bookstack-db
-docker rm bookstack-db
-
-# 3. Eliminar volumen antiguo
-docker volume rm bookstack_db
-
-# 4. Recrear con MariaDB 12
-docker compose up -d bookstack-db
-
-# 5. Esperar inicialización
-sleep 15
-
-# 6. Restaurar datos
-cat bookstack-db-migration.sql | docker exec -i bookstack-db mariadb -u bookstack -p${DB_PASSWORD} bookstack
-
-# 7. Iniciar BookStack
-docker start bookstack
-```
+Para SAML u OAuth, consulta la documentación oficial de administración:
+https://www.bookstackapp.com/docs/admin/third-party-auth/
 
 ---
 
@@ -421,114 +210,79 @@ docker start bookstack
 
 ### BookStack no inicia
 
-**Síntomas**: Contenedor se reinicia constantemente
-
-**Diagnóstico**:
 ```bash
 docker logs bookstack
+docker logs bookstack-db
 ```
 
-**Soluciones**:
-- Verificar que MariaDB esté funcionando: `docker logs bookstack-db`
-- Comprobar contraseña en `.env`
-- Verificar permisos del volumen: `docker exec bookstack ls -la /config`
+Verifica especialmente:
+
+- que MariaDB esté arrancando correctamente
+- que `DB_PASSWORD` coincida entre contenedor y `.env`
+- que los volúmenes tengan permisos correctos
 
 ### Error de conexión a base de datos
 
-**Síntomas**: `SQLSTATE[HY000] [2002] Connection refused`
-
-**Solución**:
 ```bash
-# Verificar que MariaDB esté lista
 docker exec bookstack-db mariadb -u bookstack -p${DB_PASSWORD} -e "SELECT 1"
-
-# Reiniciar servicios en orden
-docker restart bookstack-db
-sleep 10
-docker restart bookstack
 ```
 
-### Error de permisos
+Si la base responde, reinicia BookStack:
 
-**Síntomas**: `PermissionError: [Errno 13] Permission denied`
+```bash
+docker compose restart bookstack
+```
 
-**Solución**:
+### Problemas de permisos
+
 ```bash
 docker run --rm -v bookstack_config:/data alpine chown -R 1000:1000 /data
-docker restart bookstack
-```
-
-### BookStack lento o no responde
-
-**Diagnóstico**:
-```bash
-# Ver uso de recursos
-docker stats bookstack bookstack-db
-
-# Ver queries lentas en MariaDB
-docker exec bookstack-db mariadb -u bookstack -p${DB_PASSWORD} -e "SHOW FULL PROCESSLIST;"
-```
-
-**Soluciones**:
-- Limpiar caché: `docker exec bookstack php artisan cache:clear`
-- Optimizar BD: `docker exec bookstack-db mariadb-optimize -u bookstack -p${DB_PASSWORD} bookstack`
-- Regenerar índices de búsqueda: `docker exec bookstack php artisan bookstack:regenerate-search`
-
-### Comandos de emergencia
-
-```bash
-# Reiniciar todo el stack
-docker restart bookstack bookstack-db
-
-# Ver logs en tiempo real
-docker logs -f --tail 100 bookstack
-
-# Acceder a shell de BookStack
-docker exec -it bookstack bash
-
-# Ejecutar comandos artisan
-docker exec bookstack php artisan tinker
-
-# Limpiar todo el caché
-docker exec bookstack php artisan cache:clear
-docker exec bookstack php artisan config:clear
-docker exec bookstack php artisan view:clear
-docker restart bookstack
+docker compose restart bookstack
 ```
 
 ---
 
-## Variables de Entorno
+## Seguridad
 
-### Requeridas
+### Recomendaciones
 
-| Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `APP_URL` | URL final de acceso a BookStack | `http://localhost:6875` |
-| `APP_KEY` | Clave de encriptación Laravel | `base64:generada_con_docker` |
-| `DB_PASSWORD` | Contraseña de MariaDB | `generada_con_openssl` |
+1. Cambia las credenciales administrativas en el primer acceso.
+2. Publica el servicio detrás de HTTPS si habrá acceso remoto.
+3. Desactiva el registro público si no es estrictamente necesario.
+4. Haz backups periódicos de `bookstack_config` y `bookstack_db`.
+5. Mantén las imágenes actualizadas.
 
-### Opcionales
+---
 
-| Variable | Descripción | Valor por defecto |
-|----------|-------------|-------------------|
-| `DB_NAME` | Nombre de la base de datos | `bookstack` |
-| `DB_USER` | Usuario de MariaDB | `bookstack` |
-| `PUID` / `PGID` | UID/GID del usuario | `1000` |
-| `TZ` | Zona horaria | `Europe/Madrid` |
+## Backup y Restauración
+
+### Backup
+
+```bash
+docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-backup-$(date +%Y%m%d).sql
+
+docker run --rm -v bookstack_config:/backup -v $(pwd):/target alpine \
+  tar czf /target/bookstack-config-$(date +%Y%m%d).tar.gz -C /backup .
+```
+
+### Restauración
+
+```bash
+docker compose stop bookstack
+
+cat bookstack-backup-YYYYMMDD.sql | docker exec -i bookstack-db \
+  mariadb -u bookstack -p${DB_PASSWORD} bookstack
+
+docker run --rm -v bookstack_config:/restore -v $(pwd):/source alpine \
+  tar xzf /source/bookstack-config-YYYYMMDD.tar.gz -C /restore
+
+docker compose start bookstack
+```
 
 ---
 
 ## Recursos
 
-- [Documentación oficial de BookStack](https://www.bookstackapp.com/docs/)
-- [LinuxServer BookStack Image](https://docs.linuxserver.io/images/docker-bookstack)
-- [BookStack GitHub](https://github.com/BookStackApp/BookStack)
-- [BookStack Demo](https://demo.bookstackapp.com/)
-- [API Documentation](https://demo.bookstackapp.com/api/docs)
-
----
-
-## Licencia
-
-BookStack es software de código abierto bajo licencia MIT.
+- Documentación oficial LinuxServer: https://docs.linuxserver.io/images/docker-bookstack
+- Documentación oficial BookStack: https://www.bookstackapp.com/docs/
+- Autenticación externa: https://www.bookstackapp.com/docs/admin/third-party-auth/
