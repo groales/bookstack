@@ -17,7 +17,7 @@ services:
       DB_USERNAME: ${DB_USER:-bookstack}
       DB_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - bookstack_config:/config
+      - ./config:/config
     networks:
       - proxy
       - default
@@ -37,8 +37,6 @@ services:
       - bookstack_db:/var/lib/mysql
 
 volumes:
-  bookstack_config:
-    name: bookstack_config
   bookstack_db:
     name: bookstack_db
 

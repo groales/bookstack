@@ -30,6 +30,7 @@ Este repositorio contiene:
 - `compose.yaml` - Stack base de BookStack y MariaDB
 - `.env.example` - Plantilla de variables de entorno
 - `README.md` - Esta documentación
+- `config/` - Persistencia local de BookStack (se crea al arrancar)
 
 ---
 
@@ -163,9 +164,9 @@ docker compose up -d
 ## Estructura de Persistencia
 
 ```text
-Volúmenes Docker:
-├── bookstack_config  -> /config
-└── bookstack_db      -> /var/lib/mysql
+Persistencia:
+├── ./config      -> /config
+└── bookstack_db  -> /var/lib/mysql
 ```
 
 ---
@@ -236,7 +237,7 @@ docker compose restart bookstack
 ### Problemas de permisos
 
 ```bash
-docker run --rm -v bookstack_config:/data alpine chown -R 1000:1000 /data
+docker run --rm -v $(pwd)/config:/data alpine chown -R 1000:1000 /data
 docker compose restart bookstack
 ```
 
@@ -249,7 +250,7 @@ docker compose restart bookstack
 1. Cambia las credenciales administrativas en el primer acceso.
 2. Publica el servicio detrás de HTTPS si habrá acceso remoto.
 3. Desactiva el registro público si no es estrictamente necesario.
-4. Haz backups periódicos de `bookstack_config` y `bookstack_db`.
+4. Haz backups periódicos de `./config` y `bookstack_db`.
 5. Mantén las imágenes actualizadas.
 
 ---
@@ -261,7 +262,7 @@ docker compose restart bookstack
 ```bash
 docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-backup-$(date +%Y%m%d).sql
 
-docker run --rm -v bookstack_config:/backup -v $(pwd):/target alpine \
+docker run --rm -v $(pwd)/config:/backup -v $(pwd):/target alpine \
   tar czf /target/bookstack-config-$(date +%Y%m%d).tar.gz -C /backup .
 ```
 
@@ -273,7 +274,7 @@ docker compose stop bookstack
 cat bookstack-backup-YYYYMMDD.sql | docker exec -i bookstack-db \
   mariadb -u bookstack -p${DB_PASSWORD} bookstack
 
-docker run --rm -v bookstack_config:/restore -v $(pwd):/source alpine \
+docker run --rm -v $(pwd)/config:/restore -v $(pwd):/source alpine \
   tar xzf /source/bookstack-config-YYYYMMDD.tar.gz -C /restore
 
 docker compose start bookstack
