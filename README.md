@@ -40,7 +40,7 @@ Antes del primer arranque, genera los valores necesarios:
 
 ```bash
 # APP_KEY de BookStack
-docker run --rm lscr.io/linuxserver/bookstack:latest php /app/www/artisan key:generate --show
+docker run -it --rm --entrypoint /bin/bash lscr.io/linuxserver/bookstack appkey
 
 # Contraseña de MariaDB
 openssl rand -base64 32
