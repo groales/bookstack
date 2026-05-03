@@ -19,9 +19,11 @@ Referencia oficial de instalación: https://docs.linuxserver.io/images/docker-bo
 - Docker Engine instalado
 - Docker Compose instalado
 - Red Docker externa `proxy` creada si vas a publicar BookStack detrás de un proxy inverso genérico
-- Variables `APP_KEY` y `DB_PASSWORD` generadas antes del despliegue
+- Variables `APP_KEY`, `DB_PASSWORD` y `ROOT_PASSWORD` definidas antes del despliegue
 
 > ⚠️ **Importante**: Este `compose.yaml` ya incluye MariaDB, por lo que BookStack y la base de datos se despliegan juntos.
+>
+> ✅ MariaDB no publica puertos al host: solo es accesible desde la red interna de Docker.
 
 ## Archivos de este Repositorio
 
@@ -31,6 +33,7 @@ Este repositorio contiene:
 - `.env.example` - Plantilla de variables de entorno
 - `README.md` - Esta documentación
 - `config/` - Persistencia local de BookStack (se crea al arrancar)
+- `db/config/` - Persistencia local de MariaDB (se crea al arrancar)
 
 ---
 
@@ -71,12 +74,15 @@ Contenido esperado:
 
 ```env
 APP_URL=http://localhost:6875
-APP_KEY='base64:tu_clave_generada'
-DB_PASSWORD='tu_password_generado'
+APP_KEY=''
+DB_PASSWORD=''
+ROOT_PASSWORD=''
 
 DB_NAME=bookstack
 DB_USER=bookstack
 ```
+
+Luego reemplaza los valores vacios de `APP_KEY`, `DB_PASSWORD` y `ROOT_PASSWORD` por claves generadas seguras.
 
 ### 3. Crear la red externa si vas a usar proxy
 
@@ -165,8 +171,8 @@ docker compose up -d
 
 ```text
 Persistencia:
-├── ./config      -> /config
-└── bookstack_db  -> /var/lib/mysql
+├── ./config      -> /config (bookstack)
+└── ./db/config   -> /config (bookstack-db)
 ```
 
 ---
@@ -180,6 +186,7 @@ Persistencia:
 | `APP_URL` | URL final de acceso a BookStack | `http://localhost:6875` |
 | `APP_KEY` | Clave de aplicación Laravel | Sin valor por defecto |
 | `DB_PASSWORD` | Contraseña de MariaDB | Sin valor por defecto |
+| `ROOT_PASSWORD` | Contraseña root de MariaDB | Sin valor por defecto |
 | `DB_NAME` | Nombre de la base de datos | `bookstack` |
 | `DB_USER` | Usuario de base de datos | `bookstack` |
 
@@ -221,11 +228,12 @@ Verifica especialmente:
 - que MariaDB esté arrancando correctamente
 - que `DB_PASSWORD` coincida entre contenedor y `.env`
 - que los volúmenes tengan permisos correctos
+- que no intentas conectar a MariaDB desde fuera del stack (no hay puerto publicado)
 
 ### Error de conexión a base de datos
 
 ```bash
-docker exec bookstack-db mariadb -u bookstack -p${DB_PASSWORD} -e "SELECT 1"
+docker exec bookstack-db mariadb -u ${DB_USER:-bookstack} -p${DB_PASSWORD} -e "SELECT 1"
 ```
 
 Si la base responde, reinicia BookStack:
@@ -249,9 +257,10 @@ docker compose restart bookstack
 
 1. Cambia las credenciales administrativas en el primer acceso.
 2. Publica el servicio detrás de HTTPS si habrá acceso remoto.
-3. Desactiva el registro público si no es estrictamente necesario.
-4. Haz backups periódicos de `./config` y `bookstack_db`.
-5. Mantén las imágenes actualizadas.
+3. Mantén MariaDB sin puertos publicados salvo necesidad operativa puntual.
+4. Desactiva el registro público si no es estrictamente necesario.
+5. Haz backups periódicos de `./config` y `./db/config`.
+6. Mantén las imágenes actualizadas.
 
 ---
 
@@ -260,7 +269,7 @@ docker compose restart bookstack
 ### Backup
 
 ```bash
-docker exec bookstack-db mariadb-dump -u bookstack -p${DB_PASSWORD} bookstack > bookstack-backup-$(date +%Y%m%d).sql
+docker exec bookstack-db mariadb-dump -u ${DB_USER:-bookstack} -p${DB_PASSWORD} ${DB_NAME:-bookstack} > bookstack-backup-$(date +%Y%m%d).sql
 
 docker run --rm -v $(pwd)/config:/backup -v $(pwd):/target alpine \
   tar czf /target/bookstack-config-$(date +%Y%m%d).tar.gz -C /backup .
@@ -272,7 +281,7 @@ docker run --rm -v $(pwd)/config:/backup -v $(pwd):/target alpine \
 docker compose stop bookstack
 
 cat bookstack-backup-YYYYMMDD.sql | docker exec -i bookstack-db \
-  mariadb -u bookstack -p${DB_PASSWORD} bookstack
+  mariadb -u ${DB_USER:-bookstack} -p${DB_PASSWORD} ${DB_NAME:-bookstack}
 
 docker run --rm -v $(pwd)/config:/restore -v $(pwd):/source alpine \
   tar xzf /source/bookstack-config-YYYYMMDD.tar.gz -C /restore
